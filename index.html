@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>バス定期代比較アプリ</title>
+        <style>
+            input[type="number"]{
+                width: 5em;
+            }
+            input[type="checkbox"]{
+                width: 0;
+                height: 0;
+                margin: 0;
+                padding: 0;
+                visibility: hidden;
+            }
+            input[type="checkbox"] + label{
+                display:inline-block;
+                border-style: solid;
+                border-color: #ffffff;
+                margin-top: 0.2em;
+                margin-bottom: 0.5em;
+                padding-left: 0.3em;
+                padding-right: 0.3em;
+                background-color: #ffffff;
+                color: #ffffff;
+                border-radius: 30%;
+                user-select: none;
+            }
+            input[type="checkbox"]:checked + label{
+                border-color: #777777;
+                background-color: #8d77c7;
+            }
+            div#form{
+                display: flex;
+                flex-wrap: wrap;
+            }
+            div#form p{
+                display: flexbox;
+                background-color: #eeeeaa;
+                padding: 1em;
+                margin: 1em;
+                border-radius: 15%;
+            }
+            h1{
+                color: #ffffff;
+                background-color: #cedfb8;
+                text-align: center;
+                border-radius: 3%  3% / 30% 30%;
+            }
+            h2{
+                font-size: 1.2em;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>比較ツール</h1>
+        <h2>前提条件</h2>
+        <form autocomplete="off">
+            <div id="form">
+            <p id="normalForm">
+                通常<br>
+                往復:<input type="number" id="normalFare" min="0" value="310">円<br>
+                PASPY割引<br>
+                <span id="discountSpan">
+                    <label>
+                        <input type="radio" name="discount" value="yes">あり
+                    </label>
+                    <label>
+                        <input type="radio" name="discount" value="no" checked>なし
+                    </label>
+                </span>
+                <span id="readOnlyElement"></span>
+            </p>
+            <p id="trainPassForm">
+                定期代<br>
+                1か月:<input type="number" id="oneMonth" min="0" value="11160">円<br>
+                3か月:<input type="number" id="threeMonths" min="0" value="31810">円<br>
+                6か月:<input type="number" id="sixMonths" min="0" value="60260">円
+            </p>
+            <p id="termForm">
+                期間<br>
+                使う曜日<br>
+                <input type="checkbox" class="DayOfTheWeek" id="Sunday" value="Sunday">
+                <label for="Sunday">日</label>
+
+                <input type="checkbox" class="DayOfTheWeek" id="Monday" value="Monday">
+                <label for="Monday">月</label>
+
+                <input type="checkbox" class="DayOfTheWeek" id="Tuesday" value="Tuesday">
+                <label for="Tuesday">火</label>
+
+                <input type="checkbox" class="DayOfTheWeek" id="Wednesday" value="Wednesday">
+                <label for="Wednesday">水</label>
+
+                <input type="checkbox" class="DayOfTheWeek" id="Thursday" value="Thursday">
+                <label for="Thursday">木</label>
+
+                <input type="checkbox" class="DayOfTheWeek" id="Friday" value="Friday">
+                <label for="Friday">金</label>
+
+                <input type="checkbox" class="DayOfTheWeek" id="Saturday" value="Saturday">
+                <label for="Saturday">土</label>
+                <br>
+                開始日<input type="date" id="beginDate" value="2000-01-01"><br>
+                終了日<input type="date" id="endDate" value="2000-01-01">
+            </p>
+            </div>
+            <p>
+                (初期値:横川-市立大学前)<br>
+                1日1往復するものとする<br>
+                定期の場合、期間中は定期のみを使うものとする
+            </p>
+        </form>
+        <div id="result">
+            <h2>結果</h2>
+            <p id="totalCost">
+                通常の場合:<span id="normalCost">0</span>円<br>
+                定期の場合:<span id="passCost">0</span>円
+            </p>
+            <h2>結論</h2>
+            <h3 id="conclusion">変わらない</h3>
+            <p>差額:<span id="diff">0</span>円</p>
+        </div>
+        <script>
+            // 要素保持定数の初期化
+
+            // フォームを内包するコンテナの要素
+            const formDivElement = document.getElementById("form");
+
+            const normalFareElement = document.getElementById("normalFare");
+            const discountSpanElement = document.getElementById("discountSpan");
+            const discountSelectionElements = document.getElementsByName("discount");
+            const additionalElement = document.getElementById("readOnlyElement");
+
+            const oneMonthPassElement = document.getElementById("oneMonth");
+            const threeMonthsPassElement = document.getElementById("threeMonths");
+            const sixMonthsPassElement = document.getElementById("sixMonths");
+
+            const weekElements = document.getElementsByClassName("DayOfTheWeek");
+            const beginDateElement = document.getElementById("beginDate");
+            const endDateElement = document.getElementById("endDate");
+
+            const normalCostElement = document.getElementById("normalCost");
+            const passCostElement = document.getElementById("passCost");
+            const conclusionElement = document.getElementById("conclusion");
+            const diffElement = document.getElementById("diff");
+
+            // 日付の初期値設定
+
+            beginDateElement.valueAsNumber = Date.now().toString();
+            endDateElement.valueAsNumber = Date.now().toString();
+
+            // グローバル変数群の初期化
+            let normalFare = parseInt(normalFareElement.value);
+            
+            let oneMonthPass = parseInt(oneMonthPassElement.value);
+            let threeMonthsPass = parseInt(threeMonthsPassElement.value);
+            let sixMonthsPass = parseInt(sixMonthsPassElement.value);
+
+            let beginDate = new Date(beginDateElement.valueAsNumber);
+            let endDate = new Date(endDateElement.valueAsNumber);
+            
+            let week = new Array(7);
+            for(let i = 0; i < week.length; i++){
+                week[i] = false;
+            }
+
+            // テスト関数定義
+
+            // ドライバ呼び出し関数
+            function _test_drivers(){
+                _test_calcTerm();
+                _test_countTimes();
+                _test_calcDiscount();
+            }
+            
+            // ドライバ呼び出し関数の呼び出し
+            _test_drivers();
+
+            function _test_calcTerm(){
+                const testData = [[new Date(2020, 4, 3), new Date(2020, 4, 5), 3],
+                                  [new Date(2020, 7, 30), new Date(2020, 8, 1), 3]];
+                for(let i = 0; i < testData.length; i++){
+                    let data = testData[i];
+                    if(calcTerm(data[0], data[1]) !== data[2]){
+                        console.log("calcTerm() is unsafe.");
+                        console.log(data);
+                        return;
+                    }
+                }
+                console.log("calcTerm() is safe.");
+            }
+
+            function _test_countTimes(){
+                const week = [true, false, true, false, true, false, true];
+                const testData = [[new Date(2022, 1, 10), new Date(2022, 1, 11), 1],
+                                  [new Date(2022, 1, 28), new Date(2022, 2, 1), 1]];
+                for(let i = 0; i < testData.length; i++){
+                    let data = testData[i];
+                    if(countTimes(data[0], data[1], week) !== data[2]){
+                        console.log("countTimes() is unsafe.");
+                        console.log(data);
+                        return;
+                    }
+                }
+                console.log("countTimes() is safe.");
+            }
+
+            function _test_calcDiscount(){
+                //1割引で端数は10円単位へ切り上げとなる
+                const testData = [[100, 90], [101, 100]];
+                for(let i = 0; i < testData.length; i++){
+                    let data = testData[i];
+                    if(calcDiscount(data[0]) !== data[1]){
+                        console.log("calcDiscount() is unsafe.");
+                        console.log(data);
+                        return;
+                    }
+                }
+                console.log("calcDiscount() is safe.");
+            }
+
+            // 関数定義
+
+            function calcTerm(date1, date2){
+                return 1 + (date2.getTime() - date1.getTime()) / 1000 / 60 / 60 / 24;
+            }
+
+            function countTimes(date1, date2, week){
+                let count = 0;
+                let idx = date1.getDay();
+                let term = calcTerm(date1, date2);
+
+                for(let i = 0; i < 7; i++){
+                    if(week[idx]){
+                        count += Math.ceil(term / 7); 
+                    }
+                    term--;
+                    if(term <= 0){
+                        break;
+                    }
+                    idx++;
+                    if(6 < idx){
+                        idx = 0;
+                    }
+                }
+
+                return count;
+            }
+
+            function calcDiscount(fare){
+                return (10 * Math.ceil(fare * 0.9 / 10));
+            }
+
+            function getNormalFare(normalFare){
+                let fare = normalFare;
+                if(discountSelectionElements[0].checked){
+                    fare = calcDiscount(fare);
+                }
+
+                const cost =  fare * 2 * countTimes(beginDate, endDate, week);
+
+                return cost;
+            }
+
+            // 定期代計算関数
+            // 定期の期限は有効期間から数か月後の同じ日の前日まで
+            // ただし同じ日がその月にない場合、その月の最終日までが期限になる
+            function calcPassFare(){
+                // 一度もバスを使用する曜日がなければ0を返す
+                if(week.every((x) => x === false)){
+                    return 0;
+                }
+
+                let date = new Date(beginDate.getTime());
+                let passCost = 0;
+                let ifPassCosts = [0, 0, 0];
+                let count = [Infinity, Infinity, Infinity];
+
+                // 引数分の月が経過した後の有効期限最終日を取得する関数
+                let getPassedTimeFunc = function(tookMonths){
+                    let temporaryDate = new Date(date.getTime());
+                    let month = temporaryDate.getMonth() + tookMonths;
+                    temporaryDate.setMonth(temporaryDate.getMonth() + tookMonths);
+                    if(11 < month){
+                        month %= 12;
+                    }
+                    if(temporaryDate.getMonth() !== month){
+                        temporaryDate.setDate(0);
+                    }else{
+                        temporaryDate.setDate(temporaryDate.getDate() - 1);
+                    }
+                    return temporaryDate;
+                };
+                
+                while(true){
+                    let temporaryDate = getPassedTimeFunc(6);
+
+                    // 移動後のUNIX時間が終了日以内だった場合、
+                    // すなわち終了日ちょうど、あるいは超えていない場合に
+                    // コストを加算して元の日付に仮の日付を設定
+                    // 終了日ちょうどの時はそれを確定コストとしてループを抜ける
+                    // 日付を翌日にして開始日とする
+                    // 終了日超過の時はコストを加算して確定コストとしてループを抜ける
+                    if(temporaryDate.getTime() <= endDate.getTime()){
+                        passCost += sixMonthsPass;
+                        date = temporaryDate;
+                        count[0]++;
+                        if(temporaryDate.getTime() == endDate.getTime()){
+                            ifPassCosts[0] = passCost;
+                            break;
+                        }
+                        date.setDate(date.getDate() + 1);
+                    }else{
+                        ifPassCosts[0] = passCost + sixMonthsPass;
+                        break;
+                    }
+                }
+                while(true){
+                    let temporaryDate = getPassedTimeFunc(3);
+
+                    if(temporaryDate.getTime() <= endDate.getTime()){
+                        passCost += threeMonthsPass;
+                        date = temporaryDate;
+                        count[1]++;
+                        if(temporaryDate.getTime() == endDate.getTime()){
+                            ifPassCosts[1] = passCost;
+                            break;
+                        }
+                        date.setDate(date.getDate() + 1);
+                    }else{
+                        ifPassCosts[1] = passCost + threeMonthsPass;
+                        break;
+                    }
+                }
+                while(true){
+                    let temporaryDate = getPassedTimeFunc(1);
+
+                    if(temporaryDate.getTime() <= endDate.getTime()){
+                        passCost += oneMonthPass;
+                        date = temporaryDate;
+                        count[2]++;
+                        if(temporaryDate.getTime() == endDate.getTime()){
+                            ifPassCosts[2] = passCost;
+                            break;
+                        }
+                        date.setDate(date.getDate() + 1);
+                    }else{
+                        ifPassCosts[2] = passCost + oneMonthPass;
+                        break;
+                    }
+                }
+
+                return Math.min(...ifPassCosts);
+            }
+
+            function insertCosts(){
+                const normalCost = getNormalFare(normalFare);
+                normalCostElement.innerHTML = normalCost.toString();
+
+                const passCost = calcPassFare();
+                passCostElement.innerHTML = passCost.toString();
+
+                makeAConclusion(normalCost, passCost);
+            }
+
+            function makeAConclusion(normalCost, passCost){
+                if(normalCost == passCost){
+                    conclusionElement.innerHTML = "変わらない";
+                }else if(normalCost < passCost){
+                    conclusionElement.innerHTML = "通常のほうが安い！";
+                }else{
+                    conclusionElement.innerHTML = "定期のほうが安い！";
+                }
+
+                diffElement.innerHTML = Math.abs(normalCost - passCost);
+            }
+
+            // イベントリスナーの設定
+
+            // フォームのいずれかの変更をキャッチするたびに再計算する
+            const formDivChanged = formDivElement.addEventListener("change", function(){
+                insertCosts();
+            });
+
+            // 標準運賃の変更をキャッチして値を更新し、
+            // 割引の再判定を行うために割引オプション有効化のイベントを発火させる
+            const normalFareChanged = normalFareElement.addEventListener("change", function(){
+                normalFare = parseInt(normalFareElement.value);
+                discountSpanElement.dispatchEvent(new Event("change"));
+            }, false);
+
+            
+            // 割引オプションの有効化・無効化の変更をキャッチして変更を確認した後それに伴う処理を行う
+
+            const discountChanged = discountSpanElement.addEventListener("change", function(){
+                if(discountSelectionElements[0].checked){
+                    let fare = calcDiscount(normalFare);
+                    additionalElement.innerHTML = "<br>割引適用後:<span id=\"discountFare\">" + fare + "</span>円";
+                }
+                if(discountSelectionElements[1].checked){
+                    if(additionalElement.children.length != 0){
+                        additionalElement.innerHTML = null;
+                    }
+                }
+            }, false);
+
+            // 定期代が変更されるたびに変数を更新する
+
+            const oneMonthPassChanged = oneMonthPassElement.addEventListener("change", function(){
+                oneMonthPass = parseInt(oneMonthPassElement.value);
+            }, false);
+
+            const threeMonthsPassChanged = threeMonthsPassElement.addEventListener("change", function(){
+                threeMonthsPass = parseInt(threeMonthsPassElement.value);
+            }, false);
+
+            const sixMonthsPassChanged = sixMonthsPassElement.addEventListener("change", function(){
+                sixMonthsPass = parseInt(sixMonthsPassElement.value);
+            }, false);
+
+            // 曜日の変更をキャッチして曜日を取得する
+
+            const dayOfTheWeekChanged = (function(){
+                let ar = new Array(weekElements.length);
+                for(let i = 0; i < weekElements.length; i++){
+                    ar[i] = weekElements[i].addEventListener("change", function(){
+                        if(weekElements[i].checked){
+                            week[i] = true;
+                        }else{
+                            week[i] = false;
+                        }
+                    }, false);
+                }
+                return ar;
+            })();
+
+            // 日時の変更をキャッチして期間を更新する
+
+            const beginDateChanged = beginDateElement.addEventListener("change", function(){
+                if(isNaN(beginDateElement.valueAsNumber)){
+                    beginDateElement.valueAsNumber = Date.now();
+                }else{
+                    beginDate.setTime(beginDateElement.valueAsNumber);
+                }
+            }, false);
+
+            const endDateChanged = endDateElement.addEventListener("change", function(){
+                if(isNaN(endDateElement.valueAsNumber)){
+                    endDateElement.valueAsNumber = Date.now();
+                }else{
+                    endDate.setTime(endDateElement.valueAsNumber);
+                }
+            }, false);
+
+        </script>
+    </body>
+</html>
